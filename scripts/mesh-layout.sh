@@ -13,6 +13,10 @@ declare -a target_r1=()
 declare -a target_c1=()
 declare -a target_r2=()
 declare -a target_c2=()
+parsed_r1=0
+parsed_c1=0
+parsed_r2=0
+parsed_c2=0
 
 fail() {
   tmux display-message "$PROGRAM: $1"
@@ -41,11 +45,6 @@ reset_targets() {
 
 parse_rect_token() {
   local rect="$1"
-  local -n rr1_ref="$2"
-  local -n cc1_ref="$3"
-  local -n rr2_ref="$4"
-  local -n cc2_ref="$5"
-  local parsed_r1 parsed_c1 parsed_r2 parsed_c2
 
   if [[ "$rect" =~ ^([1-9][0-9]*),([1-9][0-9]*)(-([1-9][0-9]*),([1-9][0-9]*))?$ ]]; then
     parsed_r1="${BASH_REMATCH[1]}"
@@ -69,11 +68,6 @@ parse_rect_token() {
   if (( parsed_r1 < 1 || parsed_c1 < 1 || parsed_r2 > rows || parsed_c2 > cols )); then
     fail "panel coordinates must stay inside the grid"
   fi
-
-  rr1_ref="$parsed_r1"
-  cc1_ref="$parsed_c1"
-  rr2_ref="$parsed_r2"
-  cc2_ref="$parsed_c2"
 }
 
 rectangles_overlap() {
@@ -93,7 +87,11 @@ add_target_rect() {
   local rect="$1"
   local rr1 cc1 rr2 cc2 i
 
-  parse_rect_token "$rect" rr1 cc1 rr2 cc2
+  parse_rect_token "$rect"
+  rr1="$parsed_r1"
+  cc1="$parsed_c1"
+  rr2="$parsed_r2"
+  cc2="$parsed_c2"
 
   for ((i = 0; i < target_count; i++)); do
     if rectangles_overlap \

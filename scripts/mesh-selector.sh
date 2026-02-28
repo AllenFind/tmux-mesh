@@ -25,6 +25,8 @@ screen_initialized=0
 cursor_row=1
 cursor_col=1
 anchor=""
+cell_style_result=""
+cell_label_result=""
 
 preview_left=$((popup_width - grid_left - preview_w))
 
@@ -193,13 +195,11 @@ clear_region() {
 cell_style_and_label() {
   local row="$1"
   local col="$2"
-  local -n style_ref="$3"
-  local -n label_ref="$4"
   local sr=0 sc=0 er=0 ec=0
   local panel_index cr1 cc1 cr2 cc2 panel_style_code
 
-  style_ref="default"
-  label_ref="${row},${col}"
+  cell_style_result="default"
+  cell_label_result="${row},${col}"
 
   if [[ -n "$committed" ]]; then
     IFS='|' read -r -a committed_items <<<"$committed"
@@ -207,8 +207,8 @@ cell_style_and_label() {
       IFS='-,' read -r cr1 cc1 cr2 cc2 <<<"${committed_items[$panel_index]}"
       if (( row >= cr1 && row <= cr2 && col >= cc1 && col <= cc2 )); then
         panel_style_code="$(panel_style "$panel_index")"
-        style_ref="panel:$panel_style_code"
-        label_ref="P$((panel_index + 1))"
+        cell_style_result="panel:$panel_style_code"
+        cell_label_result="P$((panel_index + 1))"
         return 0
       fi
     done
@@ -217,12 +217,12 @@ cell_style_and_label() {
   if [[ -n "$selection" ]]; then
     IFS='-,' read -r sr sc er ec <<<"$selection"
     if (( row >= sr && row <= er && col >= sc && col <= ec )); then
-      style_ref="current"
+      cell_style_result="current"
     fi
   fi
 
-  if (( row == cursor_row && col == cursor_col )) && [[ "$style_ref" == "default" ]]; then
-    style_ref="cursor"
+  if (( row == cursor_row && col == cursor_col )) && [[ "$cell_style_result" == "default" ]]; then
+    cell_style_result="cursor"
   fi
 }
 
@@ -236,7 +236,9 @@ draw_cell() {
   bottom=$((top + cell_h - 1))
   right=$((left + cell_w - 1))
 
-  cell_style_and_label "$row" "$col" style label
+  cell_style_and_label "$row" "$col"
+  style="$cell_style_result"
+  label="$cell_label_result"
   draw_box "$top" "$left" "$bottom" "$right" "$label" "$style"
   overlay_label "$row" "$col"
 }
