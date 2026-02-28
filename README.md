@@ -15,7 +15,7 @@ Examples:
 With TPM:
 
 ```tmux
-set -g @plugin 'yourname/tmux-mesh'
+set -g @plugin 'AllenFind/tmux-mesh'
 run '~/.tmux/plugins/tpm/tpm'
 ```
 
