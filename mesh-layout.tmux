@@ -13,4 +13,4 @@ menu_key="${menu_key:-M}"
 prompt_key="${prompt_key:-m}"
 
 tmux bind-key "$menu_key" run-shell "$SCRIPT menu"
-tmux bind-key "$prompt_key" display-popup -w 82 -h 23 -E "$SELECTOR"
+tmux bind-key "$prompt_key" display-popup -d "#{pane_current_path}" -w 82 -h 23 -E "$SELECTOR"

@@ -576,7 +576,7 @@ main() {
       c|C)
         if [[ -n "$committed" ]]; then
           status_message="creating tmux window"
-          create_command="$(printf "%q apply-new-window 4x4 %q" "$LAYOUT_SCRIPT" "$committed")"
+          create_command="$(printf "%q apply-new-window 4x4 %q %q" "$LAYOUT_SCRIPT" "$committed" "$PWD")"
           tmux run-shell "if $create_command >>$LOG_FILE 2>&1; then tmux display-message 'tmux-mesh: window created'; else tmux display-message 'tmux-mesh: create failed, see /tmp/tmux-mesh.log'; fi"
           exit 0
         fi

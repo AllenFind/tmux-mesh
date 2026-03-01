@@ -2,6 +2,8 @@
 
 `tmux-mesh` is a tmux plugin for creating a new window from a grid template and, optionally, merging a rectangular set of cells into one larger pane.
 
+New windows and panes inherit the current tmux pane's working directory.
+
 The default interaction is a tmux popup with a `4x4` mesh. You drag across cells with the mouse, commit one rectangle at a time as a panel, then create the final tmux window when the layout is ready.
 
 Examples:

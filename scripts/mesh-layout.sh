@@ -17,10 +17,28 @@ parsed_r1=0
 parsed_c1=0
 parsed_r2=0
 parsed_c2=0
+base_path=""
 
 fail() {
   tmux display-message "$PROGRAM: $1"
   exit 1
+}
+
+resolve_base_path() {
+  local explicit_path="${1:-}"
+  local current_pane="${TMUX_PANE:-}"
+
+  if [[ -n "$explicit_path" ]]; then
+    base_path="$explicit_path"
+    return 0
+  fi
+
+  if [[ -n "$current_pane" ]]; then
+    base_path="$(tmux display-message -p -t "$current_pane" '#{pane_current_path}')"
+    return 0
+  fi
+
+  base_path="$(pwd)"
 }
 
 parse_grid() {
@@ -351,7 +369,7 @@ split_row() {
   percent=$((bottom_height * 100 / (top_height + bottom_height)))
   percent="$(clamp_percent "$percent")"
 
-  bottom_pane="$(tmux split-window -d -v -t "$pane" -p "$percent" -P -F '#{pane_id}')"
+  bottom_pane="$(tmux split-window -c "$base_path" -d -v -t "$pane" -p "$percent" -P -F '#{pane_id}')"
   build_region "$pane" "$r1" "$c1" "$boundary" "$c2"
   build_region "$bottom_pane" "$((boundary + 1))" "$c1" "$r2" "$c2"
 }
@@ -370,7 +388,7 @@ split_col() {
   percent=$((right_width * 100 / (left_width + right_width)))
   percent="$(clamp_percent "$percent")"
 
-  right_pane="$(tmux split-window -d -h -t "$pane" -p "$percent" -P -F '#{pane_id}')"
+  right_pane="$(tmux split-window -c "$base_path" -d -h -t "$pane" -p "$percent" -P -F '#{pane_id}')"
   build_region "$pane" "$r1" "$c1" "$r2" "$boundary"
   build_region "$right_pane" "$r1" "$((boundary + 1))" "$r2" "$c2"
 }
@@ -421,7 +439,7 @@ apply_layout() {
 }
 
 new_window() {
-  tmux new-window -P -F '#{window_id}'
+  tmux new-window -c "$base_path" -P -F '#{window_id}'
 }
 
 prompt_for_merge() {
@@ -437,6 +455,7 @@ prompt_for_merge() {
 prompt_new_window() {
   local window_id
 
+  resolve_base_path "${1:-}"
   window_id="$(new_window)"
   tmux command-prompt \
     -I "2x2" \
@@ -447,19 +466,22 @@ prompt_new_window() {
 apply_new_window() {
   local grid="$1"
   local rects="${2:-}"
+  local path="${3:-}"
   local window_id
 
+  resolve_base_path "$path"
   window_id="$(new_window)"
   apply_layout "$window_id" "$grid" "$rects"
 }
 
 menu() {
+  resolve_base_path "${1:-}"
   tmux display-menu -T "$PROGRAM" \
     "2x2 grid" "" "run-shell '$0 apply-new-window 2x2'" \
     "2x3 grid" "" "run-shell '$0 apply-new-window 2x3'" \
     "3x3 grid" "" "run-shell '$0 apply-new-window 3x3'" \
     "4x4 grid" "" "run-shell '$0 apply-new-window 4x4'" \
-    "4x4 mouse selector" "" "display-popup -w 82 -h 23 -E '$SELECTOR_SCRIPT'" \
+    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 23 -E '$SELECTOR_SCRIPT'" \
     "Custom..." "" "run-shell '$0 prompt-new-window'" \
     "2x3 with center merge" "" "run-shell '$0 apply-new-window 2x3 1,2-2,2'" \
     "4x4 with 2x2 merge" "" "run-shell '$0 apply-new-window 4x4 2,2-3,3'"
@@ -467,19 +489,21 @@ menu() {
 
 case "${1:-}" in
   apply)
+    resolve_base_path "${5:-}"
     apply_layout "$2" "$3" "${4:-}"
     ;;
   apply-new-window)
-    apply_new_window "$2" "${3:-}"
+    apply_new_window "$2" "${3:-}" "${4:-}"
     ;;
   menu)
-    menu
+    menu "${2:-}"
     ;;
   prompt-merge)
+    resolve_base_path "${4:-}"
     prompt_for_merge "$2" "$3"
     ;;
   prompt-new-window)
-    prompt_new_window
+    prompt_new_window "${2:-}"
     ;;
   *)
     fail "unknown command"
