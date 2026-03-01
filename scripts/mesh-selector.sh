@@ -511,7 +511,7 @@ draw_info() {
   printf '\033[22;2H%s%s' "$path_label" "$trimmed"
   if [[ -z "$path_input" ]]; then
     trimmed="$(trim_display_text "(blank uses $default_path)" "$((info_width - ${#path_label}))")"
-    printf '\033[22;%sH%s' "$((2 + ${#path_label} + 1))" "$trimmed"
+    printf '\033[23;2H%s' "$trimmed"
   fi
 
   if (( input_mode == 1 )); then
@@ -521,7 +521,7 @@ draw_info() {
     printf '\033[?25l'
   fi
 
-  line=23
+  line=24
   for ((index = start_index; index < ${#autocomplete_matches[@]} && index < end_index; index++)); do
     suggestion="${autocomplete_matches[$index]}"
     trimmed="$(trim_display_text "$suggestion" 72)"
