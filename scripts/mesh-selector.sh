@@ -198,6 +198,16 @@ clear_region() {
   printf '\033[0m'
 }
 
+repeat_char() {
+  local char="$1"
+  local count="$2"
+  local index
+
+  for ((index = 0; index < count; index++)); do
+    printf '%s' "$char"
+  done
+}
+
 cell_style_and_label() {
   local row="$1"
   local col="$2"
@@ -458,11 +468,13 @@ handle_path_input() {
 draw_info() {
   local path_label path_value suggestion line trimmed cursor_col
   local visible_count=10 start_index=0 end_index=0 index has_more=0
-  local signature=""
+  local signature="" info_width status_width
 
   path_label="path: "
   path_value="$(current_path_display)"
-  trimmed="$(trim_display_text "$path_value" 62)"
+  info_width=$((popup_width - 4))
+  status_width=$((info_width - 8))
+  trimmed="$(trim_display_text "$path_value" "$((info_width - ${#path_label}))")"
   cursor_col=$((2 + ${#path_label} + ${#trimmed}))
 
   if (( autocomplete_index >= 0 && autocomplete_index >= visible_count )); then
@@ -488,15 +500,17 @@ draw_info() {
   fi
   last_info_signature="$signature"
 
-  clear_region 17 2 14 78
+  clear_region 17 2 14 "$info_width"
   printf '\033[17;2HMove HJKL/arrows  Mark v  Add a  Path o  Complete Tab'
   printf '\033[18;2HCreate Enter/c  Cancel Esc'
-  printf '\033[19;2H────────────────────────────────────────────────────────────────────────────'
-  printf '\033[20;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" 66)"
-  printf '\033[21;2H────────────────────────────────────────────────────────────────────────────'
+  printf '\033[19;2H'
+  repeat_char "─" "$info_width"
+  printf '\033[20;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" "$status_width")"
+  printf '\033[21;2H'
+  repeat_char "─" "$info_width"
   printf '\033[22;2H%s%s' "$path_label" "$trimmed"
   if [[ -z "$path_input" ]]; then
-    trimmed="$(trim_display_text "(blank uses $default_path)" 62)"
+    trimmed="$(trim_display_text "(blank uses $default_path)" "$((info_width - ${#path_label}))")"
     printf '\033[22;%sH%s' "$((2 + ${#path_label} + 1))" "$trimmed"
   fi
 
