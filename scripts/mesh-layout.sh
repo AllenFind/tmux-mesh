@@ -25,11 +25,16 @@ fail() {
 }
 
 resolve_base_path() {
-  local explicit_path="${1:-}"
+  local source="${1:-}"
   local current_pane="${TMUX_PANE:-}"
 
-  if [[ -n "$explicit_path" ]]; then
-    base_path="$explicit_path"
+  if [[ -n "$source" && "$source" == %* ]]; then
+    base_path="$(tmux display-message -p -t "$source" '#{pane_current_path}')"
+    return 0
+  fi
+
+  if [[ -n "$source" ]]; then
+    base_path="$source"
     return 0
   fi
 
@@ -449,11 +454,12 @@ new_window() {
 prompt_for_merge() {
   local window_id="$1"
   local grid="$2"
-  local script_quoted path_quoted command
+  local source="${3:-}"
+  local script_quoted source_quoted command
 
   script_quoted="$(shell_quote "$0")"
-  path_quoted="$(shell_quote "$base_path")"
-  command="$(printf "%s apply %s %s \"%%%%\" %s" "$script_quoted" "$window_id" "$grid" "$path_quoted")"
+  source_quoted="$(shell_quote "$source")"
+  command="$(printf "%s apply %s %s \"%%%%\" %s" "$script_quoted" "$window_id" "$grid" "$source_quoted")"
   tmux command-prompt \
     -I "" \
     -p "Merge cells blank|r1,c1-r2,c2" \
@@ -461,14 +467,15 @@ prompt_for_merge() {
 }
 
 prompt_new_window() {
+  local source="${1:-}"
   local window_id
-  local script_quoted path_quoted command
+  local script_quoted source_quoted command
 
-  resolve_base_path "${1:-}"
+  resolve_base_path "$source"
   script_quoted="$(shell_quote "$0")"
-  path_quoted="$(shell_quote "$base_path")"
+  source_quoted="$(shell_quote "$source")"
   window_id="$(new_window)"
-  command="$(printf "%s prompt-merge %s \"%%%%\" %s" "$script_quoted" "$window_id" "$path_quoted")"
+  command="$(printf "%s prompt-merge %s \"%%%%\" %s" "$script_quoted" "$window_id" "$source_quoted")"
   tmux command-prompt \
     -I "2x2" \
     -p "Mesh grid rowsxcols" \
@@ -487,21 +494,21 @@ apply_new_window() {
 }
 
 menu() {
-  local script_quoted selector_quoted path_quoted
+  local script_quoted selector_quoted source_quoted
 
   resolve_base_path "${1:-}"
   script_quoted="$(shell_quote "$0")"
   selector_quoted="$(shell_quote "$SELECTOR_SCRIPT")"
-  path_quoted="$(shell_quote "$base_path")"
+  source_quoted="$(shell_quote "${1:-}")"
   tmux display-menu -T "$PROGRAM" \
-    "2x2 grid" "" "run-shell '$script_quoted apply-new-window 2x2 \"\" $path_quoted'" \
-    "2x3 grid" "" "run-shell '$script_quoted apply-new-window 2x3 \"\" $path_quoted'" \
-    "3x3 grid" "" "run-shell '$script_quoted apply-new-window 3x3 \"\" $path_quoted'" \
-    "4x4 grid" "" "run-shell '$script_quoted apply-new-window 4x4 \"\" $path_quoted'" \
-    "4x4 mouse selector" "" "display-popup -d '$path_quoted' -w 82 -h 23 -E '$selector_quoted'" \
-    "Custom..." "" "run-shell '$script_quoted prompt-new-window $path_quoted'" \
-    "2x3 with center merge" "" "run-shell '$script_quoted apply-new-window 2x3 1,2-2,2 $path_quoted'" \
-    "4x4 with 2x2 merge" "" "run-shell '$script_quoted apply-new-window 4x4 2,2-3,3 $path_quoted'"
+    "2x2 grid" "" "run-shell '$script_quoted apply-new-window 2x2 \"\" $source_quoted'" \
+    "2x3 grid" "" "run-shell '$script_quoted apply-new-window 2x3 \"\" $source_quoted'" \
+    "3x3 grid" "" "run-shell '$script_quoted apply-new-window 3x3 \"\" $source_quoted'" \
+    "4x4 grid" "" "run-shell '$script_quoted apply-new-window 4x4 \"\" $source_quoted'" \
+    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 23 -E 'SOURCE_PANE=$source_quoted $selector_quoted'" \
+    "Custom..." "" "run-shell '$script_quoted prompt-new-window $source_quoted'" \
+    "2x3 with center merge" "" "run-shell '$script_quoted apply-new-window 2x3 1,2-2,2 $source_quoted'" \
+    "4x4 with 2x2 merge" "" "run-shell '$script_quoted apply-new-window 4x4 2,2-3,3 $source_quoted'"
 }
 
 case "${1:-}" in
