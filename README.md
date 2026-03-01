@@ -45,7 +45,7 @@ set -g @mesh_layout_prompt_key 'G'
 2. Drag across the `4x4` popup grid with the mouse
 3. Press `Enter` to save that rectangle as the next panel
 4. Repeat until you have the panel groups you want
-5. Press `o` to edit the target path, then use `Tab` to complete directories if needed
+5. Press `o` to edit the target path, then use `Tab` to complete directories if needed; type `~/` to complete from your home directory
 6. Press `Enter` or `c` to create the new window
 7. Press `q` or `Esc` to cancel
 

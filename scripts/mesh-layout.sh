@@ -44,7 +44,7 @@ expand_path_input() {
       printf '%s\n' "$HOME"
       ;;
     "~/"*)
-      printf '%s/%s\n' "$HOME" "${input#~/}"
+      printf '%s/%s\n' "$HOME" "${input#"~/"}"
       ;;
     /*)
       printf '%s\n' "$input"

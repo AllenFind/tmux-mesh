@@ -340,7 +340,7 @@ path_lookup_seed() {
       printf '%s/' "$HOME"
       ;;
     "~/"*)
-      printf '%s/%s' "$HOME" "${raw#~/}"
+      printf '%s/%s' "$HOME" "${raw#"~/"}"
       ;;
     /*)
       printf '%s' "$raw"
@@ -349,6 +349,26 @@ path_lookup_seed() {
       printf '%s/%s' "$default_path" "$raw"
       ;;
   esac
+}
+
+display_path_for_match() {
+  local match="$1"
+  local raw="${path_input:-}"
+
+  case "$raw" in
+    "~"|"~/"*)
+      if [[ "$match" == "$HOME" ]]; then
+        printf '%s\n' "~"
+        return 0
+      fi
+      if [[ "$match" == "$HOME/"* ]]; then
+        printf '~/%s\n' "${match#"$HOME"/}"
+        return 0
+      fi
+      ;;
+  esac
+
+  printf '%s\n' "$match"
 }
 
 visible_directory_matches() {
@@ -377,13 +397,13 @@ complete_path_input() {
 
     if (( count == 1 )); then
       autocomplete_index=0
-      path_input="${autocomplete_matches[0]}"
+      path_input="$(display_path_for_match "${autocomplete_matches[0]}")"
       return 0
     fi
 
     common="$(common_prefix "${autocomplete_matches[0]}" "${autocomplete_matches[@]:1}")"
     if [[ -n "$common" && "$common" != "$seed" ]]; then
-      path_input="$common"
+      path_input="$(display_path_for_match "$common")"
       reset_autocomplete
       mapfile -t autocomplete_matches < <(visible_directory_matches "$common")
       count="${#autocomplete_matches[@]}"
@@ -396,7 +416,7 @@ complete_path_input() {
   count="${#autocomplete_matches[@]}"
   (( count > 0 )) || return 0
   autocomplete_index=$(((autocomplete_index + 1) % count))
-  path_input="${autocomplete_matches[$autocomplete_index]}"
+  path_input="$(display_path_for_match "${autocomplete_matches[$autocomplete_index]}")"
 }
 
 handle_path_input() {
