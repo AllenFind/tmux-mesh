@@ -504,10 +504,10 @@ draw_info() {
   printf '\033[17;2HMove HJKL/arrows  Mark v  Add a  Path o  Complete Tab'
   printf '\033[18;2HCreate Enter/c  Cancel Esc'
   printf '\033[19;2H'
-  repeat_char "─" "$info_width"
+  repeat_char "-" "$info_width"
   printf '\033[20;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" "$status_width")"
   printf '\033[21;2H'
-  repeat_char "─" "$info_width"
+  repeat_char "-" "$info_width"
   printf '\033[22;2H%s%s' "$path_label" "$trimmed"
   if [[ -z "$path_input" ]]; then
     trimmed="$(trim_display_text "(blank uses $default_path)" "$((info_width - ${#path_label}))")"
