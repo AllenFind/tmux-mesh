@@ -41,6 +41,10 @@ resolve_base_path() {
   base_path="$(pwd)"
 }
 
+shell_quote() {
+  printf '%q' "$1"
+}
+
 parse_grid() {
   local grid="${1:-}"
 
@@ -445,22 +449,30 @@ new_window() {
 prompt_for_merge() {
   local window_id="$1"
   local grid="$2"
+  local script_quoted path_quoted command
 
+  script_quoted="$(shell_quote "$0")"
+  path_quoted="$(shell_quote "$base_path")"
+  command="$(printf "%s apply %s %s \"%%%%\" %s" "$script_quoted" "$window_id" "$grid" "$path_quoted")"
   tmux command-prompt \
     -I "" \
     -p "Merge cells blank|r1,c1-r2,c2" \
-    "run-shell '$0 apply $window_id $grid \"%%\"'"
+    "run-shell '$command'"
 }
 
 prompt_new_window() {
   local window_id
+  local script_quoted path_quoted command
 
   resolve_base_path "${1:-}"
+  script_quoted="$(shell_quote "$0")"
+  path_quoted="$(shell_quote "$base_path")"
   window_id="$(new_window)"
+  command="$(printf "%s prompt-merge %s \"%%%%\" %s" "$script_quoted" "$window_id" "$path_quoted")"
   tmux command-prompt \
     -I "2x2" \
     -p "Mesh grid rowsxcols" \
-    "run-shell '$0 prompt-merge $window_id \"%%\"'"
+    "run-shell '$command'"
 }
 
 apply_new_window() {
@@ -475,16 +487,21 @@ apply_new_window() {
 }
 
 menu() {
+  local script_quoted selector_quoted path_quoted
+
   resolve_base_path "${1:-}"
+  script_quoted="$(shell_quote "$0")"
+  selector_quoted="$(shell_quote "$SELECTOR_SCRIPT")"
+  path_quoted="$(shell_quote "$base_path")"
   tmux display-menu -T "$PROGRAM" \
-    "2x2 grid" "" "run-shell '$0 apply-new-window 2x2'" \
-    "2x3 grid" "" "run-shell '$0 apply-new-window 2x3'" \
-    "3x3 grid" "" "run-shell '$0 apply-new-window 3x3'" \
-    "4x4 grid" "" "run-shell '$0 apply-new-window 4x4'" \
-    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 23 -E '$SELECTOR_SCRIPT'" \
-    "Custom..." "" "run-shell '$0 prompt-new-window'" \
-    "2x3 with center merge" "" "run-shell '$0 apply-new-window 2x3 1,2-2,2'" \
-    "4x4 with 2x2 merge" "" "run-shell '$0 apply-new-window 4x4 2,2-3,3'"
+    "2x2 grid" "" "run-shell '$script_quoted apply-new-window 2x2 \"\" $path_quoted'" \
+    "2x3 grid" "" "run-shell '$script_quoted apply-new-window 2x3 \"\" $path_quoted'" \
+    "3x3 grid" "" "run-shell '$script_quoted apply-new-window 3x3 \"\" $path_quoted'" \
+    "4x4 grid" "" "run-shell '$script_quoted apply-new-window 4x4 \"\" $path_quoted'" \
+    "4x4 mouse selector" "" "display-popup -d '$path_quoted' -w 82 -h 23 -E '$selector_quoted'" \
+    "Custom..." "" "run-shell '$script_quoted prompt-new-window $path_quoted'" \
+    "2x3 with center merge" "" "run-shell '$script_quoted apply-new-window 2x3 1,2-2,2 $path_quoted'" \
+    "4x4 with 2x2 merge" "" "run-shell '$script_quoted apply-new-window 4x4 2,2-3,3 $path_quoted'"
 }
 
 case "${1:-}" in
