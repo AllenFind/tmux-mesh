@@ -2,15 +2,13 @@
 
 `tmux-mesh` is a tmux plugin for creating a new window from a grid template and, optionally, merging a rectangular set of cells into one larger pane.
 
-New windows and panes inherit the current tmux pane's working directory by default, or a directory you enter in the popup path prompt.
+New windows and panes inherit the current tmux pane's working directory by default.
 
-The default interaction is a tmux popup with a `4x4` mesh. You drag across cells with the mouse, commit one rectangle at a time as a panel, then create the final tmux window when the layout is ready.
+Built-in presets:
 
-Examples:
-
-- `2x3` for a two-row, three-column mesh
-- `4x4` for a sixteen-cell mesh
-- Merge `2,2-3,4` to turn that rectangle into one larger pane while the remaining cells stay separate
+- `2x2`
+- `3x3`
+- `Two columns, right stacked`
 
 ## Install
 
@@ -29,37 +27,23 @@ run-shell '/path/to/tmux_plugin/mesh-layout.tmux'
 
 ## Default Keys
 
-- `prefix + M`: open a menu with common mesh presets
-- `prefix + m`: open the `4x4` mouse selector popup
+- `prefix + M`: open the layout menu
 
-You can override them:
+You can override it:
 
 ```tmux
 set -g @mesh_layout_menu_key 'g'
-set -g @mesh_layout_prompt_key 'G'
 ```
 
-## Mouse Flow
+## Menu Flow
 
-1. Press `prefix + m`
-2. Drag across the `4x4` popup grid with the mouse
-3. Press `Enter` to save that rectangle as the next panel
-4. Repeat until you have the panel groups you want
-5. Press `o` to edit the target path, then use `Tab` to complete directories if needed; type `~/` to complete from your home directory
-6. Press `Enter` or `c` to create the new window
-7. Press `q` or `Esc` to cancel
-
-Unassigned tiles are turned into single-tile panes when the final window is created.
-
-If the path line is left blank, `Enter` creates the new window with the current pane's working directory.
-
-## Typed Flow
-
-The old typed prompt is still available from the presets menu if you want arbitrary sizes like `2x3` or `6x4`.
+1. Press `prefix + M`
+2. Pick one of the built-in presets
+3. Use the popup path input, or leave it blank to use the current pane's working directory
+4. A new window is created with that path
 
 ## Notes
 
 - Merge selection must be a rectangle
 - Non-rectangular merges are not supported because tmux panes are built from recursive splits
 - Rebuilding an existing window layout would require removing existing panes first; the default workflow creates a fresh window instead
-- The popup selector uses `display-popup`, so it requires tmux 3.2 or newer

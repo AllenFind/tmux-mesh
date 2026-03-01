@@ -4,7 +4,7 @@ set -euo pipefail
 
 PROGRAM="tmux-mesh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SELECTOR_SCRIPT="$SCRIPT_DIR/mesh-selector.sh"
+PATH_PICKER_SCRIPT="$SCRIPT_DIR/mesh-path-picker.sh"
 
 rows=0
 cols=0
@@ -484,7 +484,6 @@ apply_layout() {
   tmux kill-pane -a -t "$root_pane"
   build_region "$root_pane" 1 1 "$rows" "$cols"
   tmux select-pane -t "$root_pane"
-  tmux display-message "$PROGRAM: built ${rows}x${cols} with ${target_count} panes"
 }
 
 new_window() {
@@ -533,22 +532,32 @@ apply_new_window() {
   apply_layout "$window_id" "$grid" "$rects"
 }
 
+open_preset_popup() {
+  local grid="$1"
+  local rects="${2:-}"
+  local label="${3:-Preset}"
+  local source="${4:-}"
+  local picker_quoted grid_quoted rects_quoted label_quoted source_quoted command
+
+  picker_quoted="$(shell_quote "$PATH_PICKER_SCRIPT")"
+  grid_quoted="$(shell_quote "$grid")"
+  rects_quoted="$(shell_quote "$rects")"
+  label_quoted="$(shell_quote "$label")"
+  source_quoted="$(shell_quote "$source")"
+  command="$(printf "%s %s %s %s %s" "$picker_quoted" "$grid_quoted" "$rects_quoted" "$label_quoted" "$source_quoted")"
+  tmux display-popup -d '#{pane_current_path}' -w 82 -h 18 -E "$command"
+}
+
 menu() {
-  local script_quoted selector_quoted source_quoted
+  local script_quoted source_quoted
 
   resolve_base_path "${1:-}"
   script_quoted="$(shell_quote "$0")"
-  selector_quoted="$(shell_quote "$SELECTOR_SCRIPT")"
   source_quoted="$(shell_quote "${1:-}")"
   tmux display-menu -T "$PROGRAM" \
-    "2x2 grid" "" "run-shell '$script_quoted apply-new-window 2x2 \"\" $source_quoted'" \
-    "2x3 grid" "" "run-shell '$script_quoted apply-new-window 2x3 \"\" $source_quoted'" \
-    "3x3 grid" "" "run-shell '$script_quoted apply-new-window 3x3 \"\" $source_quoted'" \
-    "4x4 grid" "" "run-shell '$script_quoted apply-new-window 4x4 \"\" $source_quoted'" \
-    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 30 -E 'SOURCE_PANE=$source_quoted $selector_quoted'" \
-    "Custom..." "" "run-shell '$script_quoted prompt-new-window $source_quoted'" \
-    "2x3 with center merge" "" "run-shell '$script_quoted apply-new-window 2x3 1,2-2,2 $source_quoted'" \
-    "4x4 with 2x2 merge" "" "run-shell '$script_quoted apply-new-window 4x4 2,2-3,3 $source_quoted'"
+    "2x2 grid" "" "run-shell '$script_quoted open-preset-popup 2x2 \"\" \"2x2 grid\" $source_quoted'" \
+    "3x3 grid" "" "run-shell '$script_quoted open-preset-popup 3x3 \"\" \"3x3 grid\" $source_quoted'" \
+    "Two columns, right stacked" "" "run-shell '$script_quoted open-preset-popup 2x2 1,1-2,1 \"Two columns, right stacked\" $source_quoted'"
 }
 
 case "${1:-}" in
@@ -561,6 +570,9 @@ case "${1:-}" in
     ;;
   menu)
     menu "${2:-}"
+    ;;
+  open-preset-popup)
+    open_preset_popup "$2" "${3:-}" "${4:-}" "${5:-}"
     ;;
   prompt-merge)
     resolve_base_path "${4:-}"

@@ -480,7 +480,7 @@ draw_info() {
 
   if [[ "$signature" == "$last_info_signature" ]]; then
     if (( input_mode == 1 )); then
-      printf '\033[20;%sH\033[?25h' "$cursor_col"
+      printf '\033[22;%sH\033[?25h' "$cursor_col"
     else
       printf '\033[?25l'
     fi
@@ -489,23 +489,25 @@ draw_info() {
   last_info_signature="$signature"
 
   clear_region 17 2 14 78
-  printf '\033[17;2Hmove:HJKL/arrows  mark:v  add:a  path:o  tab:complete'
-  printf '\033[18;2Hcreate:Enter/c  cancel:Esc'
-  printf '\033[19;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" 66)"
-  printf '\033[20;2H%s%s' "$path_label" "$trimmed"
+  printf '\033[17;2HMove HJKL/arrows  Mark v  Add a  Path o  Complete Tab'
+  printf '\033[18;2HCreate Enter/c  Cancel Esc'
+  printf '\033[19;2H────────────────────────────────────────────────────────────────────────────'
+  printf '\033[20;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" 66)"
+  printf '\033[21;2H────────────────────────────────────────────────────────────────────────────'
+  printf '\033[22;2H%s%s' "$path_label" "$trimmed"
   if [[ -z "$path_input" ]]; then
     trimmed="$(trim_display_text "(blank uses $default_path)" 62)"
-    printf '\033[20;%sH%s' "$((2 + ${#path_label} + 1))" "$trimmed"
+    printf '\033[22;%sH%s' "$((2 + ${#path_label} + 1))" "$trimmed"
   fi
 
   if (( input_mode == 1 )); then
-    printf '\033[20;%sH' "$cursor_col"
+    printf '\033[22;%sH' "$cursor_col"
     printf '\033[?25h'
   else
     printf '\033[?25l'
   fi
 
-  line=21
+  line=23
   for ((index = start_index; index < ${#autocomplete_matches[@]} && index < end_index; index++)); do
     suggestion="${autocomplete_matches[$index]}"
     trimmed="$(trim_display_text "$suggestion" 72)"
@@ -696,13 +698,19 @@ read_event() {
     return 0
   fi
 
-  IFS= read -rsn1 second || return 1
+  if ! IFS= read -rsn1 -t 0.05 second; then
+    printf 'ESC'
+    return 0
+  fi
   if [[ "$second" != "[" ]]; then
     printf 'ESC'
     return 0
   fi
 
-  IFS= read -rsn1 third || return 1
+  if ! IFS= read -rsn1 -t 0.05 third; then
+    printf 'ESC'
+    return 0
+  fi
   case "$third" in
     A|B|C|D)
       printf 'ARROW_%s' "$third"
@@ -796,7 +804,7 @@ create_layout() {
   draw_info
   target_path="${path_input:-${SOURCE_PANE:-}}"
   create_command="$(printf "%q apply-new-window 4x4 %q %q" "$LAYOUT_SCRIPT" "$committed" "$target_path")"
-  tmux run-shell "if $create_command >>$LOG_FILE 2>&1; then tmux display-message 'tmux-mesh: window created'; else tmux display-message 'tmux-mesh: create failed, see /tmp/tmux-mesh.log'; fi"
+  tmux run-shell "if ! $create_command >>$LOG_FILE 2>&1; then tmux display-message 'tmux-mesh: create failed, see /tmp/tmux-mesh.log'; fi"
   exit 0
 }
 
