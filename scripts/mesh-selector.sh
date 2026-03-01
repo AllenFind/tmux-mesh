@@ -351,12 +351,24 @@ path_lookup_seed() {
   esac
 }
 
+visible_directory_matches() {
+  local seed="$1"
+  local match name
+
+  while IFS= read -r match; do
+    name="${match%/}"
+    name="${name##*/}"
+    [[ "$name" == .* ]] && continue
+    printf '%s\n' "$match"
+  done < <(compgen -d -- "$seed" | sort -u)
+}
+
 complete_path_input() {
   local seed common count
 
   seed="$(path_lookup_seed)"
   if (( ${#autocomplete_matches[@]} == 0 || autocomplete_index == -1 )); then
-    mapfile -t autocomplete_matches < <(compgen -d -- "$seed" | sort -u)
+    mapfile -t autocomplete_matches < <(visible_directory_matches "$seed")
     count="${#autocomplete_matches[@]}"
 
     if (( count == 0 )); then
@@ -373,7 +385,7 @@ complete_path_input() {
     if [[ -n "$common" && "$common" != "$seed" ]]; then
       path_input="$common"
       reset_autocomplete
-      mapfile -t autocomplete_matches < <(compgen -d -- "$common" | sort -u)
+      mapfile -t autocomplete_matches < <(visible_directory_matches "$common")
       count="${#autocomplete_matches[@]}"
       if (( count == 0 )); then
         return 0
