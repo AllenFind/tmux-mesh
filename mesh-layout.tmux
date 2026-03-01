@@ -8,5 +8,5 @@ prompt_key="$(tmux show-option -gqv @mesh_layout_prompt_key)"
 menu_key="${menu_key:-M}"
 prompt_key="${prompt_key:-m}"
 tmux bind-key "$menu_key" run-shell "$script menu \"#{pane_id}\""
-tmux bind-key "$prompt_key" display-popup -d "#{pane_current_path}" -w 82 -h 23 -E "SOURCE_PANE=#{pane_id} \"$selector\""
+tmux bind-key "$prompt_key" display-popup -d "#{pane_current_path}" -w 82 -h 30 -E "SOURCE_PANE=#{pane_id} \"$selector\""
 '

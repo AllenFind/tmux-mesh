@@ -25,8 +25,14 @@ screen_initialized=0
 cursor_row=1
 cursor_col=1
 anchor=""
+input_mode=0
+path_input=""
+default_path=""
+declare -a autocomplete_matches=()
+autocomplete_index=-1
 cell_style_result=""
 cell_label_result=""
+last_info_signature=""
 
 preview_left=$((popup_width - grid_left - preview_w))
 
@@ -274,11 +280,218 @@ draw_preview() {
   fi
 }
 
+trim_display_text() {
+  local text="$1"
+  local max_width="$2"
+
+  if (( ${#text} <= max_width )); then
+    printf '%s' "$text"
+    return 0
+  fi
+
+  if (( max_width <= 3 )); then
+    printf '%.*s' "$max_width" "$text"
+    return 0
+  fi
+
+  printf '%s...' "${text:0:max_width-3}"
+}
+
+current_path_display() {
+  if [[ -n "$path_input" ]]; then
+    printf '%s' "$path_input"
+    return 0
+  fi
+
+  printf ''
+}
+
+reset_autocomplete() {
+  autocomplete_matches=()
+  autocomplete_index=-1
+}
+
+common_prefix() {
+  local prefix="$1"
+  shift
+  local value index
+
+  for value in "$@"; do
+    index=0
+    while (( index < ${#prefix} && index < ${#value} )) && [[ "${prefix:index:1}" == "${value:index:1}" ]]; do
+      ((index += 1))
+    done
+    prefix="${prefix:0:index}"
+  done
+
+  printf '%s' "$prefix"
+}
+
+path_lookup_seed() {
+  local raw="${path_input:-}"
+
+  if [[ -z "$raw" ]]; then
+    printf '%s/' "$default_path"
+    return 0
+  fi
+
+  case "$raw" in
+    "~")
+      printf '%s/' "$HOME"
+      ;;
+    "~/"*)
+      printf '%s/%s' "$HOME" "${raw#~/}"
+      ;;
+    /*)
+      printf '%s' "$raw"
+      ;;
+    *)
+      printf '%s/%s' "$default_path" "$raw"
+      ;;
+  esac
+}
+
+complete_path_input() {
+  local seed common count
+
+  seed="$(path_lookup_seed)"
+  if (( ${#autocomplete_matches[@]} == 0 || autocomplete_index == -1 )); then
+    mapfile -t autocomplete_matches < <(compgen -d -- "$seed" | sort -u)
+    count="${#autocomplete_matches[@]}"
+
+    if (( count == 0 )); then
+      return 0
+    fi
+
+    if (( count == 1 )); then
+      autocomplete_index=0
+      path_input="${autocomplete_matches[0]}"
+      return 0
+    fi
+
+    common="$(common_prefix "${autocomplete_matches[0]}" "${autocomplete_matches[@]:1}")"
+    if [[ -n "$common" && "$common" != "$seed" ]]; then
+      path_input="$common"
+      reset_autocomplete
+      mapfile -t autocomplete_matches < <(compgen -d -- "$common" | sort -u)
+      count="${#autocomplete_matches[@]}"
+      if (( count == 0 )); then
+        return 0
+      fi
+    fi
+  fi
+
+  count="${#autocomplete_matches[@]}"
+  (( count > 0 )) || return 0
+  autocomplete_index=$(((autocomplete_index + 1) % count))
+  path_input="${autocomplete_matches[$autocomplete_index]}"
+}
+
+handle_path_input() {
+  local event="$1"
+
+  case "$event" in
+    ESC)
+      input_mode=0
+      reset_autocomplete
+      status_message="path input closed"
+      ;;
+    $'\177'|$'\b')
+      if [[ -n "$path_input" ]]; then
+        path_input="${path_input%?}"
+      fi
+      reset_autocomplete
+      status_message="editing path"
+      ;;
+    $'\t')
+      complete_path_input
+      ;;
+    $'\r'|$'\n'|"")
+      input_mode=0
+      create_layout
+      return 0
+      ;;
+    *)
+      if [[ "$event" =~ ^[[:print:]]$ ]]; then
+        path_input+="$event"
+        reset_autocomplete
+        status_message="editing path"
+      fi
+      ;;
+  esac
+
+  draw_info
+}
+
 draw_info() {
-  clear_region 17 4 2 100
-  printf '\033[17;4Hmove:HJKL/arrows  select:v  commit:Enter/a  create:c  cancel:q'
-  printf '\033[18;4Hstatus: %s' "${status_message:-ready}"
-  printf '\033[0m\033[?25l'
+  local path_label path_value suggestion line trimmed cursor_col
+  local visible_count=10 start_index=0 end_index=0 index has_more=0
+  local signature=""
+
+  path_label="path: "
+  path_value="$(current_path_display)"
+  trimmed="$(trim_display_text "$path_value" 62)"
+  cursor_col=$((2 + ${#path_label} + ${#trimmed}))
+
+  if (( autocomplete_index >= 0 && autocomplete_index >= visible_count )); then
+    start_index=$((autocomplete_index - visible_count + 1))
+  fi
+  end_index=$((start_index + visible_count))
+  if (( ${#autocomplete_matches[@]} > end_index )); then
+    has_more=1
+  fi
+
+  signature="status=${status_message:-ready};path=${path_input};mode=$input_mode;index=$autocomplete_index;start=$start_index;more=$has_more"
+  for ((index = start_index; index < ${#autocomplete_matches[@]} && index < end_index; index++)); do
+    signature+=$'\n'"${autocomplete_matches[$index]}"
+  done
+
+  if [[ "$signature" == "$last_info_signature" ]]; then
+    if (( input_mode == 1 )); then
+      printf '\033[20;%sH\033[?25h' "$cursor_col"
+    else
+      printf '\033[?25l'
+    fi
+    return 0
+  fi
+  last_info_signature="$signature"
+
+  clear_region 17 2 14 78
+  printf '\033[17;2Hmove:HJKL/arrows  mark:v  add:a  path:o  tab:complete'
+  printf '\033[18;2Hcreate:Enter/c  cancel:Esc'
+  printf '\033[19;2Hstatus: %s' "$(trim_display_text "${status_message:-ready}" 66)"
+  printf '\033[20;2H%s%s' "$path_label" "$trimmed"
+  if [[ -z "$path_input" ]]; then
+    trimmed="$(trim_display_text "(blank uses $default_path)" 62)"
+    printf '\033[20;%sH%s' "$((2 + ${#path_label} + 1))" "$trimmed"
+  fi
+
+  if (( input_mode == 1 )); then
+    printf '\033[20;%sH' "$cursor_col"
+    printf '\033[?25h'
+  else
+    printf '\033[?25l'
+  fi
+
+  line=21
+  for ((index = start_index; index < ${#autocomplete_matches[@]} && index < end_index; index++)); do
+    suggestion="${autocomplete_matches[$index]}"
+    trimmed="$(trim_display_text "$suggestion" 72)"
+    if (( index == autocomplete_index )); then
+      printf '\033[48;5;250m\033[38;5;16m'
+      printf '\033[%s;2H  %-72s' "$line" "$trimmed"
+      printf '\033[0m'
+    else
+      printf '\033[%s;2H  %s' "$line" "$trimmed"
+    fi
+    ((line += 1))
+  done
+
+  if (( has_more == 1 )); then
+    printf '\033[%s;2H  ....' "$line"
+  fi
+
+  printf '\033[0m'
 }
 
 draw_static_screen() {
@@ -538,11 +751,31 @@ commit_selection() {
   return 0
 }
 
-main() {
-  local create_command
+create_layout() {
+  local create_command target_path
 
+  if [[ -z "$committed" ]]; then
+    status_message="add at least one panel first"
+    draw_screen
+    return 1
+  fi
+
+  status_message="creating tmux window"
+  draw_info
+  target_path="${path_input:-${SOURCE_PANE:-}}"
+  create_command="$(printf "%q apply-new-window 4x4 %q %q" "$LAYOUT_SCRIPT" "$committed" "$target_path")"
+  tmux run-shell "if $create_command >>$LOG_FILE 2>&1; then tmux display-message 'tmux-mesh: window created'; else tmux display-message 'tmux-mesh: create failed, see /tmp/tmux-mesh.log'; fi"
+  exit 0
+}
+
+main() {
   trap cleanup EXIT
   stty -echo -icanon time 0 min 1
+  if [[ -n "${SOURCE_PANE:-}" ]]; then
+    default_path="$(tmux display-message -p -t "$SOURCE_PANE" '#{pane_current_path}' 2>/dev/null || pwd)"
+  else
+    default_path="$(pwd)"
+  fi
 
   draw_screen
 
@@ -550,8 +783,13 @@ main() {
     local event
     event="$(read_event)" || break
 
+    if (( input_mode == 1 )); then
+      handle_path_input "$event"
+      continue
+    fi
+
     case "$event" in
-      q|Q|ESC)
+      ESC)
         exit 0
         ;;
       h|H|ARROW_D)
@@ -573,23 +811,30 @@ main() {
         commit_selection || true
         draw_screen
         ;;
+      o|O|p|P)
+        input_mode=1
+        reset_autocomplete
+        status_message="editing path"
+        draw_info
+        ;;
       c|C)
-        if [[ -n "$committed" ]]; then
-          status_message="creating tmux window"
-          create_command="$(printf "%q apply-new-window 4x4 %q %q" "$LAYOUT_SCRIPT" "$committed" "${SOURCE_PANE:-}")"
-          tmux run-shell "if $create_command >>$LOG_FILE 2>&1; then tmux display-message 'tmux-mesh: window created'; else tmux display-message 'tmux-mesh: create failed, see /tmp/tmux-mesh.log'; fi"
-          exit 0
-        fi
-        status_message="add at least one panel first"
-        draw_screen
+        create_layout || true
         ;;
       "")
-        commit_selection || true
-        draw_screen
+        if [[ -n "$selection" || -z "$committed" ]]; then
+          commit_selection || true
+          draw_screen
+        else
+          create_layout || true
+        fi
         ;;
       $'\r'|$'\n')
-        commit_selection || true
-        draw_screen
+        if [[ -n "$selection" || -z "$committed" ]]; then
+          commit_selection || true
+          draw_screen
+        else
+          create_layout || true
+        fi
         ;;
     esac
   done

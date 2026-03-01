@@ -24,26 +24,66 @@ fail() {
   exit 1
 }
 
+pane_path() {
+  local pane="${1:-}"
+
+  if [[ -n "$pane" && "$pane" == %* ]]; then
+    tmux display-message -p -t "$pane" '#{pane_current_path}'
+    return 0
+  fi
+
+  return 1
+}
+
+expand_path_input() {
+  local input="$1"
+  local relative_base="$2"
+
+  case "$input" in
+    "~")
+      printf '%s\n' "$HOME"
+      ;;
+    "~/"*)
+      printf '%s/%s\n' "$HOME" "${input#~/}"
+      ;;
+    /*)
+      printf '%s\n' "$input"
+      ;;
+    *)
+      printf '%s/%s\n' "$relative_base" "$input"
+      ;;
+  esac
+}
+
 resolve_base_path() {
   local source="${1:-}"
   local current_pane="${TMUX_PANE:-}"
+  local context_path=""
+  local expanded_path=""
 
-  if [[ -n "$source" && "$source" == %* ]]; then
-    base_path="$(tmux display-message -p -t "$source" '#{pane_current_path}')"
-    return 0
+  if [[ -n "$source" ]]; then
+    if pane_path "$source" >/dev/null; then
+      base_path="$(pane_path "$source")"
+      return 0
+    fi
+  fi
+
+  if pane_path "$current_pane" >/dev/null; then
+    context_path="$(pane_path "$current_pane")"
+  else
+    context_path="$(pwd)"
   fi
 
   if [[ -n "$source" ]]; then
-    base_path="$source"
+    expanded_path="$(expand_path_input "$source" "$context_path")"
+    if [[ ! -d "$expanded_path" ]]; then
+      fail "path does not exist: $source"
+    fi
+    base_path="$(cd "$expanded_path" && pwd)"
     return 0
   fi
 
-  if [[ -n "$current_pane" ]]; then
-    base_path="$(tmux display-message -p -t "$current_pane" '#{pane_current_path}')"
-    return 0
-  fi
-
-  base_path="$(pwd)"
+  base_path="$context_path"
 }
 
 shell_quote() {
@@ -505,7 +545,7 @@ menu() {
     "2x3 grid" "" "run-shell '$script_quoted apply-new-window 2x3 \"\" $source_quoted'" \
     "3x3 grid" "" "run-shell '$script_quoted apply-new-window 3x3 \"\" $source_quoted'" \
     "4x4 grid" "" "run-shell '$script_quoted apply-new-window 4x4 \"\" $source_quoted'" \
-    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 23 -E 'SOURCE_PANE=$source_quoted $selector_quoted'" \
+    "4x4 mouse selector" "" "display-popup -d '#{pane_current_path}' -w 82 -h 30 -E 'SOURCE_PANE=$source_quoted $selector_quoted'" \
     "Custom..." "" "run-shell '$script_quoted prompt-new-window $source_quoted'" \
     "2x3 with center merge" "" "run-shell '$script_quoted apply-new-window 2x3 1,2-2,2 $source_quoted'" \
     "4x4 with 2x2 merge" "" "run-shell '$script_quoted apply-new-window 4x4 2,2-3,3 $source_quoted'"
